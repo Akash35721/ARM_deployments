@@ -1,6 +1,6 @@
 param location string = resourceGroup().location
 param acrName string = 'acr${uniqueString(resourceGroup().id)}'
-param envName string = 'aca-env-${uniqueString(resourceGroup().id)}'
+param envName string = 'aca1-env-${uniqueString(resourceGroup().id)}'
 param appName string = 'flask-demo-app' // Updated name
 
 // 1. Provision the Azure Container Registry
