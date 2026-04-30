@@ -55,7 +55,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
     configuration: {
       ingress: {
         external: true
-        targetPort: 5000 // Standard Flask port
+        targetPort: 80 // Standard startup image 
         allowInsecure: false
       }
       registries: [
