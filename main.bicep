@@ -1,9 +1,8 @@
 param location string = resourceGroup().location
 param acrName string = 'acr2${uniqueString(resourceGroup().id)}'
 param envName string = 'aca2-env-${uniqueString(resourceGroup().id)}'
-param appName string = 'flask-demo-app'
+param appName string = 'med-ai-bot' // Updated name
 
-// 1. Provision the Azure Container Registry
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: acrName
   location: location
@@ -11,16 +10,12 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   properties: { adminUserEnabled: false }
 }
 
-// 2. ACA requires a Log Analytics workspace
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
   name: '${envName}-logs'
   location: location
-  properties: {
-    sku: { name: 'PerGB2018' }
-  }
+  properties: { sku: { name: 'PerGB2018' } }
 }
 
-// 3. Provision the Container Apps Environment
 resource containerAppEnv 'Microsoft.App/managedEnvironments@2023-05-01' = {
   name: envName
   location: location
@@ -35,43 +30,36 @@ resource containerAppEnv 'Microsoft.App/managedEnvironments@2023-05-01' = {
   }
 }
 
-// 4. Provision the Container App with Managed Identity
-//    No registries block here — the workflow adds it after the role assignment propagates
+// ── Step 1: Create the app as a BACKGROUND WORKER (No Ingress) ──
 resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
   name: appName
   location: location
-  identity: {
-    type: 'SystemAssigned'
-  }
+  identity: { type: 'SystemAssigned' }
   properties: {
     managedEnvironmentId: containerAppEnv.id
     configuration: {
-      ingress: {
-        external: true
-        targetPort: 80
-        allowInsecure: false
-      }
+      // INGRESS REMOVED ENTIRELY. This is a background polling bot.
+      activeRevisionsMode: 'Single'
     }
     template: {
       containers: [
         {
-          name: 'flask-app'
+          name: 'med-bot'
           image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
           resources: {
-            cpu: json('0.25')
-            memory: '0.5Gi'
+            cpu: json('0.5') // Increased slightly for PyTorch/YOLO overhead
+            memory: '1.0Gi'
           }
         }
       ]
       scale: {
-        minReplicas: 0
+        minReplicas: 1 // CRITICAL: Must be 1 so the bot constantly polls Telegram
         maxReplicas: 1
       }
     }
   }
 }
 
-// 5. Grant the Container App's identity permission to pull from ACR
 var acrPullRoleDefinitionId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   '7f951dda-4ed3-4680-a7ca-43fe172d538d'
