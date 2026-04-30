@@ -1,0 +1,10 @@
+# .dockerignore
+.git
+.gitignore
+.env
+__pycache__
+*.tf
+*.tfstate
+*.tfstate.backup
+ip_address.txt
+/YOLOfiles
