@@ -4,7 +4,7 @@ param envName string = 'aca-env-${uniqueString(resourceGroup().id)}'
 param appName string = 'nginx-poc-app'
 
 // 1. Provision the Azure Container Registry (Basic Tier)
-resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01-preview' = {
+resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: acrName
   location: location
   sku: {
