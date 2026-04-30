@@ -1,9 +1,9 @@
 param location string = resourceGroup().location
 param acrName string = 'acr${uniqueString(resourceGroup().id)}'
 param envName string = 'aca-env-${uniqueString(resourceGroup().id)}'
-param appName string = 'nginx-poc-app'
+param appName string = 'flask-demo-app' // Updated name
 
-// 1. Provision the Azure Container Registry (Basic Tier)
+// 1. Provision the Azure Container Registry
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: acrName
   location: location
@@ -11,11 +11,11 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
     name: 'Basic'
   }
   properties: {
-    adminUserEnabled: true
+    adminUserEnabled: false // We don't need this anymore with Managed Identity!
   }
 }
 
-// 2. ACA requires a Log Analytics workspace for the environment
+// 2. ACA requires a Log Analytics workspace
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
   name: '${envName}-logs'
   location: location
@@ -41,24 +41,35 @@ resource containerAppEnv 'Microsoft.App/managedEnvironments@2023-05-01' = {
   }
 }
 
-// 4. Provision the Nginx App (Pulling from public Docker Hub for the PoC)
+// --- THE MAGIC HAPPENS HERE ---
+
+// 4. Provision the Container App WITH a Managed Identity
 resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
   name: appName
   location: location
+  identity: {
+    type: 'SystemAssigned' // <--- This creates the identity for the app
+  }
   properties: {
     managedEnvironmentId: containerAppEnv.id
     configuration: {
       ingress: {
         external: true
-        targetPort: 80
+        targetPort: 5000 // Standard Flask port
         allowInsecure: false
       }
+      registries: [
+        {
+          server: acr.properties.loginServer
+          identity: 'system' // <--- Tells the app to use its Managed Identity
+        }
+      ]
     }
     template: {
       containers: [
         {
-          name: 'nginx'
-          image: 'nginx:latest'
+          name: 'flask-app'
+          image: '${acr.properties.loginServer}/flask-demo:latest' // <--- Points to your ACR
           resources: {
             cpu: json('0.25')
             memory: '0.5Gi'
@@ -66,9 +77,22 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
         }
       ]
       scale: {
-        minReplicas: 0 // Scales to 0 when idle to save student credits
+        minReplicas: 0
         maxReplicas: 1
       }
     }
+  }
+}
+
+// 5. Grant the Container App permission to pull from the ACR
+var acrPullRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d') // This is the fixed ID for AcrPull
+
+resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceGroup().id, acr.id, containerApp.id, 'AcrPull') // Unique name for the assignment
+  scope: acr // Scope the permission to just this ACR
+  properties: {
+    roleDefinitionId: acrPullRoleDefinitionId
+    principalId: containerApp.identity.principalId // Give the permission to the App's identity
+    principalType: 'ServicePrincipal'
   }
 }

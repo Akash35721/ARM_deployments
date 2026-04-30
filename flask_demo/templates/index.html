@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Flask App</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="glass-container">
+        <h1>Welcome to the Future</h1>
+        <p>A simple, yet elegantly designed Flask application demo.</p>
+        <button class="glow-button" onclick="celebrate()">Explore Now</button>
+    </div>
+
+    <script>
+        function celebrate() {
+            const btn = document.querySelector('.glow-button');
+            btn.textContent = 'Awesome!';
+            btn.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                btn.style.transform = 'scale(1)';
+                btn.textContent = 'Explore Now';
+            }, 300);
+        }
+    </script>
+</body>
+</html>

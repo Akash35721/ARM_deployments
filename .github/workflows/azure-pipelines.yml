@@ -1,4 +1,4 @@
-name: Deploy Nginx PoC to Azure
+name: Deploy Flask PoC to ACA
 
 on:
   push:
@@ -6,12 +6,16 @@ on:
       - main
   workflow_dispatch:
 
+env:
+  APP_NAME: 'flask-demo-app' # Must match the appName in main.bicep
+  IMAGE_NAME: 'flask-demo'
+
 permissions:
-  id-token: write # Required for OIDC authentication
+  id-token: write # Required for secure OIDC login
   contents: read
 
 jobs:
-  deploy-infra:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -24,10 +28,39 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy Bicep
+      - name: 1. Deploy Infrastructure (Bicep)
         uses: azure/arm-deploy@v2
         with:
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resourceGroupName: ${{ secrets.AZURE_RESOURCE_GROUP }}
           template: ./main.bicep
           failOnStdErr: false
+
+      - name: 2. Get ACR Name & Login
+        run: |
+          # Dynamically fetch the ACR name from your resource group
+          ACR_NAME=$(az acr list --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} --query "[0].name" -o tsv)
+          
+          # Save variables for the next steps
+          echo "ACR_NAME=$ACR_NAME" >> $GITHUB_ENV
+          echo "ACR_LOGIN_SERVER=$ACR_NAME.azurecr.io" >> $GITHUB_ENV
+          
+          # Log into the registry (Azure CLI handles auth automatically since we used OIDC!)
+          az acr login --name $ACR_NAME
+
+      - name: 3. Build and Push Docker Image
+        run: |
+          # Navigate into the flask folder where the Dockerfile lives
+          cd flask_demo
+          
+          # We use github.sha to give the image a unique tag for every single commit
+          docker build -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
+          docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: 4. Update Container App to New Image
+        run: |
+          # Tell ACA to pull the new specific image tag we just pushed
+          az containerapp update \
+            --name ${{ env.APP_NAME }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --image ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
