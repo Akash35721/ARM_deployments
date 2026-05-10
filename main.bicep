@@ -1,6 +1,6 @@
 param location string = resourceGroup().location
 param acrName string = 'acr2${uniqueString(resourceGroup().id)}'
-param envName string = 'aca2-env-${uniqueString(resourceGroup().id)}'
+param envName string = 'aca3-env-${uniqueString(resourceGroup().id)}'
 param appName string = 'med-ai-bot' // Updated name
 
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
