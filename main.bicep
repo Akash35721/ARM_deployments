@@ -47,8 +47,8 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'med-bot'
           image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
           resources: {
-            cpu: json('0.5') // Increased slightly for PyTorch/YOLO overhead
-            memory: '1.0Gi'
+            cpu: json('1') // Increased slightly for PyTorch/YOLO overhead
+            memory: '2.0Gi'
           }
         }
       ]
